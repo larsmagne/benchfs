@@ -12,7 +12,7 @@
 #include <sys/time.h>
 
 #define MAX_FILE_NAME 10000
-#define BUFFER_SIZE 4096*100
+#define BUFFER_SIZE (4096 * 100)
 
 long total_bytes = 0, total_files = 0;
 
@@ -35,17 +35,28 @@ int read_file(char *file_name) {
   }
 }
 
+#define MAX_FILE_NAMES (200000 * 30)
+
 void input_directory(const char* dir_name) {
   DIR *dirp;
   struct dirent *dp;
   char file_name[MAX_FILE_NAME];
+  char *all_files, *files;
   struct stat stat_buf;
 
-  //printf("%s\n", dir_name); 
-
+  //printf("%s\n", dir_name);
   if ((dirp = opendir(dir_name)) == NULL)
     return;
-    
+
+  if (fstat(dirfd(dirp), &stat_buf) == -1) {
+    closedir(dirp);
+    return;
+  }
+
+  all_files = malloc(stat_buf.st_size + 100);
+  files = all_files;
+  bzero(all_files, stat_buf.st_size + 100);
+
   while ((dp = readdir(dirp)) != NULL) {
     snprintf(file_name, sizeof(file_name), "%s/%s", dir_name,
 	     dp->d_name);
@@ -57,12 +68,21 @@ void input_directory(const char* dir_name) {
 	  input_directory(file_name);
 	else if (S_ISREG(stat_buf.st_mode)) {
 	  total_files++;
-	  total_bytes += read_file(file_name);
+	  strcpy(files, dp->d_name);
+	  files += strlen(dp->d_name) + 1;
 	}
       }
     }
   }
   closedir(dirp);
+
+  files = all_files;
+  while (*files) {
+    chdir(dir_name);
+    total_bytes += read_file(files);
+    files += strlen(files) + 1;
+  }
+  free(all_files);
 }
 
 int main(int argc, char **argv) {
