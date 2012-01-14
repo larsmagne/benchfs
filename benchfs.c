@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <time.h>
 #include <sys/time.h>
+#include <syscall.h>
 
 #define MAX_FILE_NAME 10000
 #define BUFFER_SIZE (4096 * 100)
@@ -26,7 +27,7 @@ int read_file(char *file_name) {
   int total_read = 0;
   size_t buf_size, size;
 
-  fd = open(file_name, 0);
+  fd = open(file_name, O_RDONLY);
   if (fd <= 0)
     return 0;
 
