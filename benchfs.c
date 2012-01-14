@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +24,7 @@ int read_file(char *file_name) {
   int total_read = 0;
   fd = open(file_name, 0);
   if (fd <= 0)
-    return;
+    return 0;
   while (1) {
     bytes = read(fd, buffer, BUFFER_SIZE);
     if (bytes > 0)
@@ -42,6 +43,7 @@ void input_directory(const char* dir_name) {
   struct dirent *dp;
   char file_name[MAX_FILE_NAME];
   char *all_files, *files;
+  char *all_dirs, *dirs;
   struct stat stat_buf;
   int dir_size;
 
@@ -59,32 +61,47 @@ void input_directory(const char* dir_name) {
   files = all_files;
   bzero(all_files, dir_size);
 
-  while ((dp = readdir(dirp)) != NULL) {
-    snprintf(file_name, sizeof(file_name), "%s/%s", dir_name,
-	     dp->d_name);
+  all_dirs = malloc(dir_size);
+  dirs = all_dirs;
+  bzero(all_dirs, dir_size);
 
+  chdir(dir_name);
+
+  while ((dp = readdir(dirp)) != NULL) {
     if (strcmp(dp->d_name, ".") &&
 	strcmp(dp->d_name, "..")) {
-      if (lstat(file_name, &stat_buf) != -1) {
-	if (S_ISDIR(stat_buf.st_mode))
-	  input_directory(file_name);
-	else if (S_ISREG(stat_buf.st_mode)) {
+      if (lstat(dp->d_name, &stat_buf) != -1) {
+	if (S_ISDIR(stat_buf.st_mode)) {
+	  strcpy(dirs, dp->d_name);
+	  dirs += strlen(dp->d_name) + 1;
+	} else if (S_ISREG(stat_buf.st_mode)) {
 	  total_files++;
 	  strcpy(files, dp->d_name);
 	  files += strlen(dp->d_name) + 1;
+	  //total_bytes += read_file(file_name);
 	}
       }
     }
   }
   closedir(dirp);
 
-  files = all_files;
-  while (*files) {
-    chdir(dir_name);
-    total_bytes += read_file(files);
-    files += strlen(files) + 1;
+  if (1) {
+    files = all_files;
+    while (*files) {
+      total_bytes += read_file(files);
+      files += strlen(files) + 1;
+    }
+
+    dirs = all_dirs;
+    while (*dirs) {
+      snprintf(file_name, sizeof(file_name), "%s/%s", dir_name,
+	       dirs);
+      input_directory(file_name);
+      dirs += strlen(dirs) + 1;
+    }
   }
   free(all_files);
+  free(all_dirs);
 }
 
 int main(int argc, char **argv) {
