@@ -18,28 +18,68 @@
 long total_bytes = 0, total_files = 0;
 int sequential = 0;
 
-int read_file(char *file_name) {
+int read_file_old(char *file_name) {
   static char buffer[BUFFER_SIZE];
   struct stat stat_buf;
   int fd;
   int bytes;
   int total_read = 0;
-  int size;
+  size_t buf_size, size;
+
   fd = open(file_name, 0);
   if (fd <= 0)
     return 0;
+
   fstat(fd, &stat_buf);
   size = stat_buf.st_size;
-  if (size > BUFFER_SIZE)
-    size = BUFFER_SIZE;
   if (size == 0)
     return 0;
+
+  if (size > BUFFER_SIZE)
+    buf_size = BUFFER_SIZE;
+  else
+    buf_size = size;
+
   while (1) {
-    bytes = read(fd, buffer, size);
+    bytes = read(fd, buffer, buf_size);
     if (bytes > 0)
       total_read += bytes;
-    if (bytes <= size) {
+    if (total_read == size || bytes == 0) {
       close(fd);
+      return total_read;
+    }
+  }
+}
+
+int read_file(char *file_name) {
+  static char buffer[BUFFER_SIZE];
+  FILE *fp;
+  int bytes;
+  int total_read = 0;
+  struct stat stat_buf;
+  int size, buf_size;
+
+  fp = fopen(file_name, "r");
+  if (! fp)
+    return 0;
+
+  fstat(fileno(fp), &stat_buf);
+  size = stat_buf.st_size;
+  if (size == 0)
+    return 0;
+
+  if (size > BUFFER_SIZE)
+    buf_size = BUFFER_SIZE;
+  else
+    buf_size = size;
+
+  
+  while (1) {
+    bytes = fread(buffer, 1, buf_size, fp);
+    if (bytes > 0)
+      total_read += bytes;
+    if (total_read == size || bytes == 0) {
+      fclose(fp);
       return total_read;
     }
   }
