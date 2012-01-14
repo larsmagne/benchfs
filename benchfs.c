@@ -43,6 +43,7 @@ void input_directory(const char* dir_name) {
   char file_name[MAX_FILE_NAME];
   char *all_files, *files;
   struct stat stat_buf;
+  int dir_size;
 
   //printf("%s\n", dir_name);
   if ((dirp = opendir(dir_name)) == NULL)
@@ -53,9 +54,10 @@ void input_directory(const char* dir_name) {
     return;
   }
 
-  all_files = malloc(stat_buf.st_size + 100);
+  dir_size = stat_buf.st_size + 100;
+  all_files = malloc(dir_size);
   files = all_files;
-  bzero(all_files, stat_buf.st_size + 100);
+  bzero(all_files, dir_size);
 
   while ((dp = readdir(dirp)) != NULL) {
     snprintf(file_name, sizeof(file_name), "%s/%s", dir_name,
