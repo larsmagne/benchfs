@@ -1,2 +1,2 @@
 all:
-	gcc -o benchfs benchfs.c
+	gcc -g -o benchfs benchfs.c
