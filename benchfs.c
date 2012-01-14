@@ -56,7 +56,7 @@ void input_directory(const char* dir_name) {
       if (stat(file_name, &stat_buf) != -1) {
 	if (S_ISDIR(stat_buf.st_mode))
 	  input_directory(file_name);
-	else {
+	else if (S_ISREG(stat_buf.st_mode)) {
 	  total_files++;
 	  total_bytes += read_file(file_name);
 	}
