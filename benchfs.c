@@ -16,7 +16,7 @@
 
 long total_bytes = 0, total_files = 0;
 
-int read_file(char *file_name, off_t size) {
+int read_file(char *file_name) {
   static char buffer[BUFFER_SIZE];
   int fd;
   int bytes;
@@ -24,17 +24,11 @@ int read_file(char *file_name, off_t size) {
   fd = open(file_name, 0);
   if (fd <= 0)
     return;
-  if (size == 0) {
-    close(fd);
-    return 0;
-  }
-  if (size > BUFFER_SIZE)
-    size = BUFFER_SIZE;
   while (1) {
-    bytes = read(fd, buffer, size);
+    bytes = read(fd, buffer, BUFFER_SIZE);
     if (bytes > 0)
       total_read += bytes;
-    if (bytes < size) {
+    if (bytes < BUFFER_SIZE) {
       close(fd);
       return total_read;
     }
@@ -53,19 +47,17 @@ void input_directory(const char* dir_name) {
     return;
     
   while ((dp = readdir(dirp)) != NULL) {
-
     snprintf(file_name, sizeof(file_name), "%s/%s", dir_name,
 	     dp->d_name);
 
     if (strcmp(dp->d_name, ".") &&
 	strcmp(dp->d_name, "..")) {
-    
       if (lstat(file_name, &stat_buf) != -1) {
 	if (S_ISDIR(stat_buf.st_mode))
 	  input_directory(file_name);
 	else if (S_ISREG(stat_buf.st_mode)) {
 	  total_files++;
-	  total_bytes += read_file(file_name, stat_buf.st_size);
+	  total_bytes += read_file(file_name);
 	}
       }
     }
