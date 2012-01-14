@@ -36,8 +36,6 @@ int read_file(char *file_name) {
   }
 }
 
-#define MAX_FILE_NAMES (200000 * 30)
-
 void input_directory(const char* dir_name) {
   DIR *dirp;
   struct dirent *dp;
