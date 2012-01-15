@@ -115,6 +115,67 @@ void input_directory_sequential(const char* dir_name) {
   free(all_dirs);
 }
 
+void input_directory_relative(const char* dir_name) {
+  DIR *dirp;
+  struct dirent *dp;
+  char file_name[MAX_FILE_NAME];
+  char *all_files, *files;
+  char *all_dirs, *dirs;
+  struct stat stat_buf;
+  int dir_size;
+
+  if ((dirp = opendir(dir_name)) == NULL)
+    return;
+
+  if (fstat(dirfd(dirp), &stat_buf) == -1) {
+    closedir(dirp);
+    return;
+  }
+
+  dir_size = stat_buf.st_size + 100;
+  all_files = malloc(dir_size);
+  files = all_files;
+  bzero(all_files, dir_size);
+  
+  all_dirs = malloc(dir_size);
+  dirs = all_dirs;
+  bzero(all_dirs, dir_size);
+  
+  while ((dp = readdir(dirp)) != NULL) {
+    if (strcmp(dp->d_name, ".") &&
+	strcmp(dp->d_name, "..")) {
+      snprintf(file_name, sizeof(file_name), "%s/%s", dir_name, dp->d_name);
+      if (lstat(file_name, &stat_buf) != -1) {
+	if (S_ISDIR(stat_buf.st_mode)) {
+	  strcpy(dirs, dp->d_name);
+	  dirs += strlen(dp->d_name) + 1;
+	} else if (S_ISREG(stat_buf.st_mode)) {
+	  total_files++;
+	  strcpy(files, dp->d_name);
+	  files += strlen(dp->d_name) + 1;
+	}
+      }
+    }
+  }
+  closedir(dirp);
+
+  files = all_files;
+  while (*files) {
+    snprintf(file_name, sizeof(file_name), "%s/%s", dir_name, files);
+    total_bytes += read_file(file_name);
+    files += strlen(files) + 1;
+  }
+  
+  dirs = all_dirs;
+  while (*dirs) {
+    snprintf(file_name, sizeof(file_name), "%s/%s", dir_name, dirs);
+    input_directory_relative(file_name);
+    dirs += strlen(dirs) + 1;
+  }
+  free(all_files);
+  free(all_dirs);
+}
+
 void input_directory_depth_first(const char* dir_name) {
   DIR *dirp;
   struct dirent *dp;
@@ -162,7 +223,10 @@ int main(int argc, char **argv) {
 
   if (! strcmp(argv[1], "-s"))
     input_directory_sequential(argv[2]);
-  else
+  else if (! strcmp(argv[1], "-r")) {
+    chdir(argv[2]);
+    input_directory_relative(".");
+  } else
     input_directory_depth_first(argv[1]);
 
   gettimeofday(&tv, NULL); 
