@@ -115,6 +115,10 @@ void input_directory_sequential(const char* dir_name) {
   free(all_dirs);
 }
 
+int compare (const void * a, const void * b) {
+  return strcmp((char*) a, (char*)b);
+}
+
 void input_directory_relative(const char* dir_name) {
   DIR *dirp;
   struct dirent *dp;
@@ -123,6 +127,8 @@ void input_directory_relative(const char* dir_name) {
   char *all_dirs, *dirs;
   struct stat stat_buf;
   int dir_size;
+  int num_files = 0, i = 0;
+  char **file_array;
 
   if ((dirp = opendir(dir_name)) == NULL)
     return;
@@ -151,6 +157,7 @@ void input_directory_relative(const char* dir_name) {
 	  dirs += strlen(dp->d_name) + 1;
 	} else if (S_ISREG(stat_buf.st_mode)) {
 	  total_files++;
+	  num_files++;
 	  strcpy(files, dp->d_name);
 	  files += strlen(dp->d_name) + 1;
 	}
@@ -160,11 +167,17 @@ void input_directory_relative(const char* dir_name) {
   closedir(dirp);
 
   files = all_files;
+  file_array = calloc(sizeof(char*), num_files);
   while (*files) {
-    snprintf(file_name, sizeof(file_name), "%s/%s", dir_name, files);
-    total_bytes += read_file(file_name);
+    file_array[i++] = files;
     files += strlen(files) + 1;
   }
+  qsort(file_array, num_files, sizeof(char*), compare);
+  for (i = 0; i < num_files; i++) {
+    snprintf(file_name, sizeof(file_name), "%s/%s", dir_name, file_array[i]);
+    total_bytes += read_file(file_name);
+  }
+  free(file_array);
   
   dirs = all_dirs;
   while (*dirs) {
@@ -224,8 +237,15 @@ int main(int argc, char **argv) {
   if (! strcmp(argv[1], "-s"))
     input_directory_sequential(argv[2]);
   else if (! strcmp(argv[1], "-r")) {
-    chdir(argv[2]);
-    input_directory_relative(".");
+    char *dir = calloc(strlen(argv[2]) + 1, 1);
+    strcpy(dir, argv[2]);
+    *strrchr(dir, '/') = 0;
+    if (strlen(dir) == 0)
+      chdir("/");
+    else
+      chdir(dir);
+    free(dir);
+    input_directory_relative(strrchr(argv[2], '/') + 1);
   } else
     input_directory_depth_first(argv[1]);
 
