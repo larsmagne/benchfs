@@ -17,7 +17,6 @@
 #define BUFFER_SIZE (4096 * 100)
 
 long total_bytes = 0, total_files = 0;
-int sequential = 0;
 
 int read_file(char *file_name) {
   static char buffer[BUFFER_SIZE];
@@ -52,7 +51,7 @@ int read_file(char *file_name) {
   }
 }
 
-void input_directory(const char* dir_name) {
+void input_directory_sequential(const char* dir_name) {
   DIR *dirp;
   struct dirent *dp;
   char file_name[MAX_FILE_NAME];
@@ -61,7 +60,6 @@ void input_directory(const char* dir_name) {
   struct stat stat_buf;
   int dir_size;
 
-  //printf("%s\n", dir_name);
   if ((dirp = opendir(dir_name)) == NULL)
     return;
 
@@ -70,73 +68,89 @@ void input_directory(const char* dir_name) {
     return;
   }
 
-  if (sequential) {
-    dir_size = stat_buf.st_size + 100;
-    all_files = malloc(dir_size);
-    files = all_files;
-    bzero(all_files, dir_size);
-    
-    all_dirs = malloc(dir_size);
-    dirs = all_dirs;
-    bzero(all_dirs, dir_size);
-
-    chdir(dir_name);
-  }
+  dir_size = stat_buf.st_size + 100;
+  all_files = malloc(dir_size);
+  files = all_files;
+  bzero(all_files, dir_size);
+  
+  all_dirs = malloc(dir_size);
+  dirs = all_dirs;
+  bzero(all_dirs, dir_size);
+  
+  chdir(dir_name);
 
   while ((dp = readdir(dirp)) != NULL) {
     if (strcmp(dp->d_name, ".") &&
 	strcmp(dp->d_name, "..")) {
-      if (sequential)
-	strcpy(file_name, dp->d_name);
-      else
-	snprintf(file_name, sizeof(file_name), "%s/%s", dir_name,
-		 dp->d_name);
+      strcpy(file_name, dp->d_name);
 
       if (lstat(file_name, &stat_buf) != -1) {
 	if (S_ISDIR(stat_buf.st_mode)) {
-	  if (sequential) {
-	    strcpy(dirs, dp->d_name);
-	    dirs += strlen(dp->d_name) + 1;
-	  } else {
-	    input_directory(file_name);
-	  }
+	  strcpy(dirs, dp->d_name);
+	  dirs += strlen(dp->d_name) + 1;
 	} else if (S_ISREG(stat_buf.st_mode)) {
 	  total_files++;
-	  if (sequential) {
-	    strcpy(files, dp->d_name);
-	    files += strlen(dp->d_name) + 1;
-	  } else {
-	    total_bytes += read_file(file_name);
-	  }
+	  strcpy(files, dp->d_name);
+	  files += strlen(dp->d_name) + 1;
 	}
       }
     }
   }
   closedir(dirp);
 
-  if (sequential) {
-    files = all_files;
-    while (*files) {
-      total_bytes += read_file(files);
-      files += strlen(files) + 1;
-    }
-
-    dirs = all_dirs;
-    while (*dirs) {
-      snprintf(file_name, sizeof(file_name), "%s/%s", dir_name,
-	       dirs);
-      input_directory(file_name);
-      dirs += strlen(dirs) + 1;
-    }
-    free(all_files);
-    free(all_dirs);
+  files = all_files;
+  while (*files) {
+    total_bytes += read_file(files);
+    files += strlen(files) + 1;
   }
+  
+  dirs = all_dirs;
+  while (*dirs) {
+    snprintf(file_name, sizeof(file_name), "%s/%s", dir_name,
+	     dirs);
+    input_directory_sequential(file_name);
+    dirs += strlen(dirs) + 1;
+  }
+  free(all_files);
+  free(all_dirs);
+}
+
+void input_directory_depth_first(const char* dir_name) {
+  DIR *dirp;
+  struct dirent *dp;
+  char file_name[MAX_FILE_NAME];
+  struct stat stat_buf;
+
+  if ((dirp = opendir(dir_name)) == NULL)
+    return;
+
+  if (fstat(dirfd(dirp), &stat_buf) == -1) {
+    closedir(dirp);
+    return;
+  }
+
+  while ((dp = readdir(dirp)) != NULL) {
+    if (strcmp(dp->d_name, ".") &&
+	strcmp(dp->d_name, "..")) {
+      snprintf(file_name, sizeof(file_name), "%s/%s", dir_name,
+	       dp->d_name);
+
+      if (lstat(file_name, &stat_buf) != -1) {
+	if (S_ISDIR(stat_buf.st_mode)) {
+	  input_directory_depth_first(file_name);
+	} else if (S_ISREG(stat_buf.st_mode)) {
+	  total_files++;
+	  total_bytes += read_file(file_name);
+	}
+      }
+    }
+  }
+  closedir(dirp);
 }
 
 int main(int argc, char **argv) {
   struct timeval tv;
   double start_time, stop_time;
-  char *dir;
 
   gettimeofday(&tv, NULL); 
   start_time = tv.tv_sec + (double)tv.tv_usec / 1000000;
@@ -146,14 +160,10 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
-  if (! strcmp(argv[1], "-s")) {
-    sequential = 1;
-    dir = argv[2];
-  } else {
-    dir = argv[1];
-  }
-  
-  input_directory(dir);
+  if (! strcmp(argv[1], "-s"))
+    input_directory_sequential(argv[2]);
+  else
+    input_directory_depth_first(argv[1]);
 
   gettimeofday(&tv, NULL); 
   stop_time = tv.tv_sec + (double)tv.tv_usec / 1000000;
