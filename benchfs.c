@@ -115,8 +115,8 @@ void input_directory_sequential(const char* dir_name) {
   free(all_dirs);
 }
 
-int compare (const void * a, const void * b) {
-  return strcmp((char*) a, (char*)b);
+int compare (const void *a, const void *b) {
+  return strcmp(*(char**) a, *(char**)b);
 }
 
 void input_directory_relative(const char* dir_name) {
